@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiPiKombat Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        .visible {
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            background: #87ceeb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐶 PiPiKombat Debug Page</h1>
+    
+    <div class="test-section">
+        <h2>Element Visibility Test</h2>
+        <p>Testing if elements can be shown/hidden properly:</p>
+        <button onclick="toggleElement('testElement')">Toggle Test Element</button>
+        <div id="testElement" class="hidden" style="background: #ff6b6b; color: white; padding: 20px; margin: 10px 0; border-radius: 10px;">
+            This is a test element that should be visible when toggled!
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Canvas Test</h2>
+        <p>Testing if the game canvas renders properly:</p>
+        <canvas id="gameCanvas" width="400" height="300"></canvas>
+        <br>
+        <button onclick="drawTest()">Draw Test Shape</button>
+        <button onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Socket Connection Test</h2>
+        <p>Testing WebSocket connection to the server:</p>
+        <button onclick="testSocket()">Test Socket Connection</button>
+        <div id="socketStatus">Not connected</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Game Screen Test</h2>
+        <p>Testing game screen visibility:</p>
+        <button onclick="showGameScreen()">Show Game Screen</button>
+        <button onclick="showWelcomeScreen()">Show Welcome Screen</button>
+        <div id="gameScreen" class="hidden" style="background: #4ecdc4; color: white; padding: 20px; margin: 10px 0; border-radius: 10px;">
+            This is the game screen - should be visible when toggled!
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket;
+        
+        function toggleElement(elementId) {
+            const element = document.getElementById(elementId);
+            if (element.classList.contains('hidden')) {
+                element.classList.remove('hidden');
+                element.classList.add('visible');
+            } else {
+                element.classList.remove('visible');
+                element.classList.add('hidden');
+            }
+        }
+
+        function drawTest() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a test dog
+            ctx.fillStyle = '#ff6b6b';
+            ctx.beginPath();
+            ctx.arc(200, 150, 30, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw ears
+            ctx.beginPath();
+            ctx.arc(180, 130, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(220, 130, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw eyes
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(190, 140, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(210, 140, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw nose
+            ctx.beginPath();
+            ctx.arc(200, 155, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add text
+            ctx.fillStyle = '#000';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Test Dog', 200, 200);
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function testSocket() {
+            try {
+                socket = io();
+                const statusDiv = document.getElementById('socketStatus');
+                
+                socket.on('connect', () => {
+                    statusDiv.innerHTML = '✅ Connected to server!';
+                    statusDiv.style.color = 'green';
+                });
+                
+                socket.on('disconnect', () => {
+                    statusDiv.innerHTML = '❌ Disconnected from server';
+                    statusDiv.style.color = 'red';
+                });
+                
+                socket.on('connect_error', (error) => {
+                    statusDiv.innerHTML = '❌ Connection error: ' + error.message;
+                    statusDiv.style.color = 'red';
+                });
+                
+            } catch (error) {
+                document.getElementById('socketStatus').innerHTML = '❌ Socket.io not loaded: ' + error.message;
+            }
+        }
+
+        function showGameScreen() {
+            const gameScreen = document.getElementById('gameScreen');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('visible');
+        }
+
+        function showWelcomeScreen() {
+            const gameScreen = document.getElementById('gameScreen');
+            gameScreen.classList.remove('visible');
+            gameScreen.classList.add('hidden');
+        }
+
+        // Initialize
+        window.onload = function() {
+            console.log('Debug page loaded');
+            drawTest(); // Draw initial test
+        };
+    </script>
+</body>
+</html> 

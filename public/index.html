@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐶 PiPiKombat - Territory Marking Battle!</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Retro scanline effect -->
+        <div class="scanline"></div>
+        
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="screen">
+            <div class="welcome-content">
+                <div class="welcome-center">
+                    <div class="logo-container">
+                        <img src="logo.png" alt="PiPiKombat Logo" class="game-logo">
+                        <h1 class="game-title fallback-title">🐶 ピピコンバット</h1>
+                    </div>
+                    <p class="game-subtitle">テリトリー争奪戦！</p>
+                    <div class="game-description">
+                        <p>🎮 おしっこでテリトリーをマークして、うんち地雷を避けて、リーダーボードを制覇しよう！</p>
+                        <p>🏠 家に戻っておしっこゲージをチャージ</p>
+                        <p>❤️ 他の犬とハグして回復</p>
+                        <p>⚔️ 衝突した時に他の犬とじゃんけんバトル</p>
+                    </div>
+                    <div class="join-form">
+                        <label for="playerName">犬の名前：</label>
+                        <input type="text" id="playerName" placeholder="犬の名前を入力" maxlength="15">
+                        <label for="breedSelect" style="margin-top:10px;">犬種：</label>
+                        <select id="breedSelect">
+                            <option value="Shiba">柴犬 🐕</option>
+                            <option value="Beagle">ビーグル 🐶</option>
+                            <option value="Bassotto">ダックスフンド 🦴</option>
+                            <option value="Bulldog">ブルドッグ 🐾</option>
+                            <option value="Barboncino">プードル 🦴</option>
+                            <option value="Golden Retriever">ゴールデンレトリバー 🦮</option>
+                            <option value="Labrador">ラブラドール 🐕‍🦺</option>
+                            <option value="Chihuahua">チワワ 🐩</option>
+                        </select>
+                        <label style="margin-top:10px;">犬の色：</label>
+                        <div id="colorSelect" class="color-palette">
+                            <button class="color-btn" style="background:#FFD700" data-color="#FFD700" title="黄色"></button>
+                            <button class="color-btn" style="background:#8B4513" data-color="#8B4513" title="茶色"></button>
+                            <button class="color-btn" style="background:#654321" data-color="#654321" title="濃い茶色"></button>
+                            <button class="color-btn" style="background:#696969" data-color="#696969" title="グレー"></button>
+                            <button class="color-btn" style="background:#F5F5DC" data-color="#F5F5DC" title="ベージュ"></button>
+                            <button class="color-btn" style="background:#DAA520" data-color="#DAA520" title="ゴールド"></button>
+                            <button class="color-btn" style="background:#000000" data-color="#000000" title="黒"></button>
+                            <button class="color-btn" style="background:#DEB887" data-color="#DEB887" title="薄い茶色"></button>
+                            <button class="color-btn" style="background:#FF69B4" data-color="#FF69B4" title="ピンク"></button>
+                            <button class="color-btn" style="background:#00BFFF" data-color="#00BFFF" title="青"></button>
+                            <button class="color-btn" style="background:#32CD32" data-color="#32CD32" title="緑"></button>
+                        </div>
+                        <label style="margin-top:10px;">おしっこの色：</label>
+                        <div id="peeColorSelect" class="color-palette">
+                            <button class="color-btn" style="background:#FFD700" data-color="#FFD700" title="黄色"></button>
+                            <button class="color-btn" style="background:#8B4513" data-color="#8B4513" title="茶色"></button>
+                            <button class="color-btn" style="background:#654321" data-color="#654321" title="濃い茶色"></button>
+                            <button class="color-btn" style="background:#696969" data-color="#696969" title="グレー"></button>
+                            <button class="color-btn" style="background:#F5F5DC" data-color="#F5F5DC" title="ベージュ"></button>
+                            <button class="color-btn" style="background:#DAA520" data-color="#DAA520" title="ゴールド"></button>
+                            <button class="color-btn" style="background:#000000" data-color="#000000" title="黒"></button>
+                            <button class="color-btn" style="background:#DEB887" data-color="#DEB887" title="薄い茶色"></button>
+                            <button class="color-btn" style="background:#FF69B4" data-color="#FF69B4" title="ピンク"></button>
+                            <button class="color-btn" style="background:#00BFFF" data-color="#00BFFF" title="青"></button>
+                            <button class="color-btn" style="background:#32CD32" data-color="#32CD32" title="緑"></button>
+                        </div>
+                    </div>
+                    <button id="joinGameBtn" class="btn-primary">🐾 バトルに参加！</button>
+                    <div class="controls-info">
+                        <h3>🎮 操作方法：</h3>
+                        <ul>
+                            <li><strong>WASD</strong> または <strong>矢印キー</strong> - 移動</li>
+                            <li><strong>スペース</strong> - おしっこ（テリトリーをマーク）</li>
+                            <li><strong>P</strong> - うんち（地雷を設置）</li>
+                            <li><strong>C</strong> - 近くの犬とハグ</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen hidden">
+            <div class="game-header">
+                <img src="logo.png" alt="PiPiKombat Logo" class="header-logo-img">
+                <div class="player-info">
+                    <div id="playerAvatar" class="player-avatar">🐕</div>
+                    <div class="player-stats">
+                        <div id="playerNameDisplay" class="player-name">プレイヤー</div>
+                        <div class="hearts-container">
+                            <span id="heartsDisplay">5</span>
+                        </div>
+                        <div class="pee-meter">
+                            <span>💧</span>
+                            <div class="pee-bar">
+                                <div id="peeBarFill" class="pee-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="game-timer">
+                    <div id="timerDisplay">5:00</div>
+                </div>
+            </div>
+            
+            <div class="game-area">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                <div class="game-overlay">
+                    <div id="battleNotification" class="battle-notification hidden">
+                        <div class="battle-content">
+                            <h3>⚔️ バトル！</h3>
+                            <p>バトル結果がここに表示されます</p>
+                        </div>
+                    </div>
+                    <div id="cuddleNotification" class="cuddle-notification hidden">
+                        <div class="cuddle-content">
+                            <h3>🤗 ハグ成功！</h3>
+                            <p>ハグで回復しました！</p>
+                        </div>
+                    </div>
+                    <div id="poopNotification" class="poop-notification hidden">
+                        <div class="poop-content">
+                            <h3>💩 うんち地雷！</h3>
+                            <p>うんち地雷を踏んでしまいました！</p>
+                        </div>
+                    </div>
+                    <div id="battleRPSModal" class="modal hidden">
+                        <div class="modal-content" style="min-width:320px;max-width:90vw;text-align:center;">
+                            <h2>じゃんけんバトル！</h2>
+                            <div id="battleRPSMessage">相手とバトル中...</div>
+                            <div style="margin:18px 0;display:flex;justify-content:center;gap:18px;">
+                                <button class="rps-btn" data-choice="rock">✊<br>グー</button>
+                                <button class="rps-btn" data-choice="paper">✋<br>パー</button>
+                                <button class="rps-btn" data-choice="scissors">✌️<br>チョキ</button>
+                            </div>
+                            <div id="battleRPSCountdown" style="font-size:1.3em;color:#2d8cff;margin-top:8px;">5</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+
+        </div>
+        
+        <!-- Leaderboard Modal -->
+        <div id="leaderboardModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <img src="logo.png" alt="PiPiKombat Logo" class="modal-logo-img">
+                    <h2>📊 リーダーボード</h2>
+                    <button class="close-btn" onclick="hideLeaderboard()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="leaderboardList"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game Over Modal -->
+        <div id="gameOverModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <img src="logo.png" alt="PiPiKombat Logo" class="modal-logo-img">
+                    <h2>🏆 ゲーム終了</h2>
+                    <button class="close-btn" onclick="hideGameOver()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="gameOverContent">
+                        <h3>🏆 ゲーム終了！</h3>
+                        <p>ゲームが終了しました！</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html> 
+</html> 
