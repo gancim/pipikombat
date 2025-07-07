@@ -13,6 +13,12 @@ let lastPeeTime = 0;
 let lastPoopTime = 0;
 let lastCuddleTime = 0;
 
+// Mobile touch state
+let touchStartX = 0;
+let touchStartY = 0;
+let isTouching = false;
+let touchDirection = { x: 0, y: 0 };
+
 // Add breed and color selection logic
 let selectedColor = null;
 let selectedPeeColor = null;
@@ -23,6 +29,23 @@ const ctx = canvas.getContext('2d');
 
 const BASE_WIDTH = 800;
 const BASE_HEIGHT = 600;
+
+// Add roundRect polyfill for kawaii rounded corners
+if (!ctx.roundRect) {
+  ctx.roundRect = function(x, y, width, height, radius) {
+    this.beginPath();
+    this.moveTo(x + radius, y);
+    this.lineTo(x + width - radius, y);
+    this.quadraticCurveTo(x + width, y, x + width, y + radius);
+    this.lineTo(x + width, y + height - radius);
+    this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    this.lineTo(x + radius, y + height);
+    this.quadraticCurveTo(x, y + height, x, y + height - radius);
+    this.lineTo(x, y + radius);
+    this.quadraticCurveTo(x, y, x + radius, y);
+    this.closePath();
+  };
+}
 
 function resizeCanvas() {
   // Calculate the largest size that fits in the window while preserving aspect ratio
@@ -49,6 +72,12 @@ const leaderboardList = document.getElementById('leaderboardList');
 const gameOverModal = document.getElementById('gameOverModal');
 const gameOverContent = document.getElementById('gameOverContent');
 
+// Mobile control buttons
+const mobilePeeBtn = document.getElementById('mobilePeeBtn');
+const mobilePoopBtn = document.getElementById('mobilePoopBtn');
+const mobileHugBtn = document.getElementById('mobileHugBtn');
+const mobileLeaderboardBtn = document.getElementById('mobileLeaderboardBtn');
+
 // Dog emojis for different breeds
 const DOG_EMOJIS = {
   'Shiba': '🐕',
@@ -70,7 +99,7 @@ function showRPSBattle(battleId, opponentName) {
   const modal = document.getElementById('battleRPSModal');
   const msg = document.getElementById('battleRPSMessage');
   const countdown = document.getElementById('battleRPSCountdown');
-  msg.textContent = `相手: ${opponentName} とバトル中... 選んでください！`;
+  msg.textContent = `Battling ${opponentName}... Choose your move!`;
   countdown.textContent = '5';
   modal.classList.remove('hidden');
   let timeLeft = 5;
@@ -120,6 +149,102 @@ function hideRPSBattle() {
   currentBattleId = null;
 }
 
+// Mobile touch controls
+function setupMobileControls() {
+  // Mobile control buttons
+  if (mobilePeeBtn) {
+    mobilePeeBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      pee();
+    });
+    mobilePeeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      pee();
+    });
+  }
+  
+  if (mobilePoopBtn) {
+    mobilePoopBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      poop();
+    });
+    mobilePoopBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      poop();
+    });
+  }
+  
+  if (mobileHugBtn) {
+    mobileHugBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      cuddle();
+    });
+    mobileHugBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      cuddle();
+    });
+  }
+  
+  if (mobileLeaderboardBtn) {
+    mobileLeaderboardBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      showLeaderboard();
+    });
+    mobileLeaderboardBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      showLeaderboard();
+    });
+  }
+
+  // Canvas touch events for movement
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+  canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+  canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+}
+
+function handleTouchStart(e) {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    isTouching = true;
+    touchDirection = { x: 0, y: 0 };
+  }
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  if (isTouching && e.touches.length === 1) {
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    
+    // Calculate direction based on touch movement
+    const threshold = 20; // Minimum movement threshold
+    
+    if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+      // Determine primary direction
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal movement
+        touchDirection.x = deltaX > 0 ? 1 : -1;
+        touchDirection.y = 0;
+      } else {
+        // Vertical movement
+        touchDirection.x = 0;
+        touchDirection.y = deltaY > 0 ? 1 : -1;
+      }
+    }
+  }
+}
+
+function handleTouchEnd(e) {
+  e.preventDefault();
+  isTouching = false;
+  touchDirection = { x: 0, y: 0 };
+}
+
 // Initialize game
 function initGame() {
   // Connect to server
@@ -127,24 +252,6 @@ function initGame() {
   
   // Event listeners
   joinGameBtn.addEventListener('click', joinGame);
-  // closeLeaderboardBtn.addEventListener('click', () => {
-  //   leaderboardModal.classList.add('hidden');
-  // });
-  
-  // leaderboardBtn.addEventListener('click', () => {
-  //   leaderboardModal.classList.remove('hidden');
-  //   socket.emit('getLeaderboard');
-  // });
-  
-  // playAgainBtn.addEventListener('click', () => {
-  //   gameOverModal.classList.add('hidden');
-  //   location.reload();
-  // });
-  
-  // Control buttons
-  // peeBtn.addEventListener('click', () => pee());
-  // poopBtn.addEventListener('click', () => poop());
-  // cuddleBtn.addEventListener('click', () => cuddle());
   
   // Keyboard controls
   document.addEventListener('keydown', handleKeyDown);
@@ -152,6 +259,9 @@ function initGame() {
   
   // Canvas click handling for buttons
   canvas.addEventListener('click', handleCanvasClick);
+  
+  // Setup mobile controls
+  setupMobileControls();
   
   // Close modal when clicking outside
   leaderboardModal.addEventListener('click', (e) => {
@@ -215,8 +325,6 @@ function setupBreedAndColorSelection() {
 // Socket event handlers
 function setupSocketEvents() {
   socket.on('gameJoined', (data) => {
-    console.log('Game joined, player data:', data);
-    console.log('Received townMap:', data.townMap);
     player = data.player;
     townMap = data.townMap;
     updatePlayerDisplay();
@@ -229,11 +337,12 @@ function setupSocketEvents() {
   });
   
   socket.on('playerJoined', (data) => {
+    console.log('Client received playerJoined:', data.player.name, 'at', data.player.x, data.player.y);
     otherPlayers.set(data.player.id, data.player);
+    console.log('Other players count after adding:', otherPlayers.size);
   });
   
   socket.on('playerMoved', (data) => {
-    console.log('playerMoved:', data);
     if (data.id !== player.id) {
       const otherPlayer = otherPlayers.get(data.id);
       if (otherPlayer) {
@@ -365,20 +474,16 @@ function showGameScreen() {
 // Update player display
 function updatePlayerDisplay() {
   if (!player) return;
-  
-  playerNameDisplay.innerHTML =
-    (DOG_EMOJIS[player.breed] ? `<span style='font-size:1.2em;'>${DOG_EMOJIS[player.breed]}</span> ` : '') +
-    `<span>${player.name}</span> <span style='font-size:0.9em;color:#888;'>(${player.breed})</span>`;
+  playerNameDisplay.innerHTML = `<span>${player.name}</span> <span style='font-size:0.9em;color:#888;'>(${player.breed})</span>`;
   // Show a row of heart icons for each heart
   heartsDisplay.textContent = '';
   for (let i = 0; i < player.hearts; i++) {
     heartsDisplay.textContent += '❤️';
   }
   peeBarFill.style.width = `${player.peeCharge}%`;
-  
-  // Update player avatar
+  // Update player avatar (no emoji)
   const playerAvatar = document.getElementById('playerAvatar');
-  playerAvatar.textContent = DOG_EMOJIS[player.breed] || '🐕';
+  playerAvatar.textContent = '';
   playerAvatar.style.backgroundColor = player.color;
 }
 
@@ -437,6 +542,19 @@ function handleCanvasClick(e) {
 function pee() {
   if (!player || !player.isAlive || player.peeCharge < 20) return;
   
+  // Check if there are at least 2 players (current player + at least 1 other)
+  let aliveOtherPlayers = 0;
+  for (const [id, otherPlayer] of otherPlayers) {
+    if (otherPlayer.isAlive) {
+      aliveOtherPlayers++;
+    }
+  }
+  
+  if (aliveOtherPlayers < 1) {
+    showNotification('battleNotification', 'Need at least 2 players to pee!');
+    return;
+  }
+  
   const now = Date.now();
   if (now - lastPeeTime < 1000) return; // Cooldown
   
@@ -446,6 +564,19 @@ function pee() {
 
 function poop() {
   if (!player || !player.isAlive) return;
+  
+  // Check if there are at least 2 players (current player + at least 1 other)
+  let aliveOtherPlayers = 0;
+  for (const [id, otherPlayer] of otherPlayers) {
+    if (otherPlayer.isAlive) {
+      aliveOtherPlayers++;
+    }
+  }
+  
+  if (aliveOtherPlayers < 1) {
+    showNotification('battleNotification', 'Need at least 2 players to poop!');
+    return;
+  }
   
   const now = Date.now();
   if (now - lastPoopTime < 3000) return; // Cooldown
@@ -491,8 +622,8 @@ function showNotification(type, message = '') {
   const content = notification.querySelector('div');
   
   if (message) {
-    content.innerHTML = `<h3>${type === 'battleNotification' ? '⚔️ バトル！' : 
-      type === 'cuddleNotification' ? '🤗 ハグ成功！' : '💩 うんち地雷！'}</h3>
+    content.innerHTML = `<h3>${type === 'battleNotification' ? '⚔️ Battle!' : 
+      type === 'cuddleNotification' ? '🤗 Hug Success!' : '💩 Poop Mine!'}</h3>
       <p>${message}</p>`;
   }
   
@@ -524,7 +655,7 @@ function updateLeaderboard(leaderboard) {
         <div class="player-breed">${player.breed}</div>
       </div>
       <div class="player-stats-leaderboard">
-        <div class="territory-percentage">${player.territoryPercentage.toFixed(1)}% テリトリー</div>
+        <div class="territory-percentage">${player.territoryPercentage.toFixed(1)}% Territory</div>
         <div class="hearts-leaderboard">❤️ ${player.hearts}</div>
       </div>
     `;
@@ -536,12 +667,12 @@ function updateLeaderboard(leaderboard) {
 // Show game over
 function showGameOver(winner) {
   gameOverContent.innerHTML = `
-    <h3>🏆 ゲーム終了！</h3>
+    <h3>🏆 Game Over!</h3>
     ${winner ? `
-      <p><strong>勝者: ${winner.name}</strong></p>
-      <p>テリトリー: ${winner.territoryPercentage.toFixed(1)}%</p>
-      <p>ハート: ❤️ ${winner.hearts}</p>
-    ` : '<p>ゲームが終了しました！</p>'}
+      <p><strong>Winner: ${winner.name}</strong></p>
+      <p>Territory: ${winner.territoryPercentage.toFixed(1)}%</p>
+      <p>Hearts: ❤️ ${winner.hearts}</p>
+    ` : '<p>The game has ended!</p>'}
   `;
   
   gameOverModal.classList.remove('hidden');
@@ -578,7 +709,10 @@ function updatePlayerMovement() {
   
   const speed = 3;
   let moved = false;
-  
+  let wasInHouse = false;
+  let peeRecharged = false;
+
+  // Keyboard controls
   if (keys['w'] || keys['arrowup']) {
     player.y = Math.max(15, player.y - speed);
     moved = true;
@@ -594,6 +728,48 @@ function updatePlayerMovement() {
   if (keys['d'] || keys['arrowright']) {
     player.x = Math.min(785, player.x + speed);
     moved = true;
+  }
+  
+  // Touch controls
+  if (isTouching && (touchDirection.x !== 0 || touchDirection.y !== 0)) {
+    if (touchDirection.y < 0) {
+      player.y = Math.max(15, player.y - speed);
+      moved = true;
+    }
+    if (touchDirection.y > 0) {
+      player.y = Math.min(585, player.y + speed);
+      moved = true;
+    }
+    if (touchDirection.x < 0) {
+      player.x = Math.max(15, player.x - speed);
+      moved = true;
+    }
+    if (touchDirection.x > 0) {
+      player.x = Math.min(785, player.x + speed);
+      moved = true;
+    }
+  }
+
+  // --- Pee recharge in house logic ---
+  if (townMap && townMap.houses && player) {
+    for (const house of townMap.houses) {
+      if (
+        player.x > house.x &&
+        player.x < house.x + house.width &&
+        player.y > house.y &&
+        player.y < house.y + house.height
+      ) {
+        wasInHouse = true;
+        if (typeof player.peeCharge === 'number' && player.peeCharge < 100) {
+          player.peeCharge = Math.min(100, player.peeCharge + 2); // Recharge 2% per frame
+          peeRecharged = true;
+        }
+        break;
+      }
+    }
+  }
+  if (peeRecharged) {
+    updatePlayerDisplay();
   }
   
   if (moved) {
@@ -619,123 +795,456 @@ function render() {
   const scale = Math.min(window.innerWidth / BASE_WIDTH, window.innerHeight / BASE_HEIGHT);
   ctx.scale(scale, scale);
   console.log('Rendering, townMap:', townMap);
-  // Clear canvas with white background
-  ctx.fillStyle = '#FFFFFF';
+  
+  // Clear canvas with kawaii pastel background
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, '#FFE5F1'); // Soft pink sky
+  gradient.addColorStop(1, '#E8F4FD'); // Soft blue ground
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   if (!townMap) return;
   
-  // Draw parks (grass areas) first
+  // Draw kawaii parks (grass areas) first
   townMap.parks.forEach(park => {
-    ctx.fillStyle = park.color;
+    // Soft pastel green background
+    ctx.fillStyle = '#B8E6B8';
     ctx.fillRect(park.x, park.y, park.width, park.height);
     
-    // Add some grass texture
-    ctx.strokeStyle = '#228B22';
+    // Add kawaii grass texture with flowers
+    ctx.strokeStyle = '#90EE90';
     ctx.lineWidth = 1;
-    for (let i = 0; i < park.width; i += 10) {
-      for (let j = 0; j < park.height; j += 10) {
+    for (let i = 0; i < park.width; i += 15) {
+      for (let j = 0; j < park.height; j += 15) {
+        // Draw grass blades
         ctx.beginPath();
         ctx.moveTo(park.x + i, park.y + j);
-        ctx.lineTo(park.x + i + 5, park.y + j + 5);
+        ctx.lineTo(park.x + i + 3, park.y + j - 5);
+        ctx.stroke();
+        
+        // Draw cute flowers randomly
+        if (Math.random() < 0.3) {
+          ctx.fillStyle = ['#FFB6C1', '#FFC0CB', '#DDA0DD', '#F0E68C'][Math.floor(Math.random() * 4)];
+          ctx.beginPath();
+          ctx.arc(park.x + i + 5, park.y + j + 5, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    
+    // Add kawaii border
+    ctx.strokeStyle = '#98FB98';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(park.x, park.y, park.width, park.height);
+  });
+  
+  // Draw kawaii roads
+  townMap.roads.forEach(road => {
+    // Soft gray road
+    ctx.fillStyle = '#F5F5F5';
+    ctx.fillRect(road.x, road.y, road.width, road.height);
+    
+    // Add kawaii road markings with hearts
+    ctx.strokeStyle = '#FFB6C1';
+    ctx.lineWidth = 3;
+    if (road.width > road.height) {
+      // Horizontal road with dotted line
+      for (let i = 0; i < road.width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(road.x + i, road.y + road.height / 2);
+        ctx.lineTo(road.x + i + 10, road.y + road.height / 2);
+        ctx.stroke();
+      }
+    } else {
+      // Vertical road with dotted line
+      for (let i = 0; i < road.height; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(road.x + road.width / 2, road.y + i);
+        ctx.lineTo(road.x + road.width / 2, road.y + i + 10);
         ctx.stroke();
       }
     }
-  });
-  
-  // Draw roads
-  townMap.roads.forEach(road => {
-    ctx.fillStyle = road.color;
-    ctx.fillRect(road.x, road.y, road.width, road.height);
     
-    // Add road markings
-    ctx.strokeStyle = '#FFFFFF';
+    // Add cute road border
+    ctx.strokeStyle = '#E0E0E0';
     ctx.lineWidth = 2;
-    if (road.width > road.height) {
-      // Horizontal road
-      ctx.beginPath();
-      ctx.moveTo(road.x, road.y + road.height / 2);
-      ctx.lineTo(road.x + road.width, road.y + road.height / 2);
-      ctx.stroke();
-    } else {
-      // Vertical road
-      ctx.beginPath();
-      ctx.moveTo(road.x + road.width / 2, road.y);
-      ctx.lineTo(road.x + road.width / 2, road.y + road.height);
-      ctx.stroke();
-    }
+    ctx.strokeRect(road.x, road.y, road.width, road.height);
   });
   
-  // Draw landmarks
+  // Draw kawaii landmarks
   townMap.landmarks.forEach(landmark => {
     if (landmark.type === 'fountain') {
-      // Draw fountain
-      ctx.fillStyle = landmark.color;
+      // Draw kawaii fountain
+      ctx.fillStyle = '#E6F3FF';
       ctx.fillRect(landmark.x, landmark.y, landmark.width, landmark.height);
-      ctx.strokeStyle = '#4682B4';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(landmark.x, landmark.y, landmark.width, landmark.height);
       
-      // Fountain water effect
+      // Fountain base with rounded corners
+      ctx.fillStyle = '#B0E0E6';
+      ctx.beginPath();
+      ctx.roundRect(landmark.x, landmark.y, landmark.width, landmark.height, 10);
+      ctx.fill();
+      
+      // Fountain water effect with sparkles
       ctx.fillStyle = '#87CEEB';
       ctx.beginPath();
       ctx.arc(landmark.x + landmark.width/2, landmark.y + landmark.height/2, 15, 0, Math.PI * 2);
       ctx.fill();
-    } else if (landmark.type === 'shop') {
-      // Draw shop
-      ctx.fillStyle = landmark.color;
-      ctx.fillRect(landmark.x, landmark.y, landmark.width, landmark.height);
-      ctx.strokeStyle = '#FF69B4';
-      ctx.lineWidth = 2;
+      
+      // Add sparkles around fountain
+      ctx.fillStyle = '#FFD700';
+      for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI * 2) / 8;
+        const x = landmark.x + landmark.width/2 + Math.cos(angle) * 25;
+        const y = landmark.y + landmark.height/2 + Math.sin(angle) * 25;
+        ctx.beginPath();
+        ctx.arc(x, y, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Fountain border
+      ctx.strokeStyle = '#4682B4';
+      ctx.lineWidth = 3;
       ctx.strokeRect(landmark.x, landmark.y, landmark.width, landmark.height);
       
-      // Shop sign
-      ctx.fillStyle = '#FF1493';
-      ctx.fillRect(landmark.x + 10, landmark.y - 15, 80, 10);
+    } else if (landmark.type === 'shop') {
+      // Draw kawaii shop
+      ctx.fillStyle = '#FFE4E1';
+      ctx.fillRect(landmark.x, landmark.y, landmark.width, landmark.height);
+      
+      // Shop base with rounded corners
+      ctx.fillStyle = '#FFB6C1';
+      ctx.beginPath();
+      ctx.roundRect(landmark.x, landmark.y, landmark.width, landmark.height, 8);
+      ctx.fill();
+      
+      // Kawaii shop sign
+      ctx.fillStyle = '#FF69B4';
+      ctx.fillRect(landmark.x + 10, landmark.y - 20, 80, 15);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '10px VT323';
+      ctx.font = 'bold 12px Inter';
       ctx.textAlign = 'center';
-      ctx.fillText('🏪 ショップ', landmark.x + landmark.width/2, landmark.y - 8);
+      ctx.fillText('🏪 Shop', landmark.x + landmark.width/2, landmark.y - 10);
+      
+      // Add cute decorations
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(landmark.x + 15, landmark.y + 15, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(landmark.x + landmark.width - 15, landmark.y + 15, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
   });
   
-  // Draw houses
-  townMap.houses.forEach(house => {
-    // House base
-    ctx.fillStyle = house.color;
-    ctx.fillRect(house.x, house.y, house.width, house.height);
+  // Draw realistic kawaii houses in different architectural styles
+  townMap.houses.forEach((house, index) => {
+    const houseType = index % 5; // 5 different house types
+    const centerX = house.x + house.width / 2;
+    const centerY = house.y + house.height / 2;
     
-    // House outline
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(house.x, house.y, house.width, house.height);
+    switch (houseType) {
+      case 0: // Victorian House
+        // Main structure with realistic proportions
+        ctx.fillStyle = '#F5DEB3';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+        
+        // Stone foundation
+        ctx.fillStyle = '#8B7355';
+        ctx.fillRect(house.x - 2, house.y + house.height - 8, house.width + 4, 8);
+        
+        // Victorian roof with proper pitch
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(house.x - 10, house.y);
+        ctx.lineTo(centerX, house.y - 25);
+        ctx.lineTo(house.x + house.width + 10, house.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Chimney
+        ctx.fillStyle = '#A0522D';
+        ctx.fillRect(centerX - 3, house.y - 35, 6, 15);
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(centerX - 3, house.y - 35, 6, 15);
+        
+        // Roof shingles detail
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath();
+          ctx.moveTo(house.x - 10 + i * 8, house.y - i * 3);
+          ctx.lineTo(house.x + house.width + 10 - i * 8, house.y - i * 3);
+          ctx.stroke();
+        }
+        break;
+        
+      case 1: // Modern Minimalist House
+        // Clean rectangular base
+        ctx.fillStyle = '#F8F8FF';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+        
+        // Flat roof with overhang
+        ctx.fillStyle = '#2F4F4F';
+        ctx.fillRect(house.x - 5, house.y - 8, house.width + 10, 8);
+        
+        // Large windows (modern style)
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(house.x + 8, house.y + 8, 25, 20);
+        ctx.fillRect(house.x + house.width - 33, house.y + 8, 25, 20);
+        
+        // Window frames
+        ctx.strokeStyle = '#2F4F4F';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(house.x + 8, house.y + 8, 25, 20);
+        ctx.strokeRect(house.x + house.width - 33, house.y + 8, 25, 20);
+        
+        // Minimalist door
+        ctx.fillStyle = '#2F4F4F';
+        ctx.fillRect(house.x + 25, house.y + 25, 30, 35);
+        break;
+        
+      case 2: // Cottage House
+        // Stone base
+        ctx.fillStyle = '#D2B48C';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+        
+        // Thatched roof with realistic texture
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(house.x - 8, house.y);
+        ctx.lineTo(centerX, house.y - 20);
+        ctx.lineTo(house.x + house.width + 8, house.y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Thatch texture lines
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 8; i++) {
+          ctx.beginPath();
+          ctx.moveTo(house.x - 8 + i * 4, house.y - i * 2);
+          ctx.lineTo(house.x + house.width + 8 - i * 4, house.y - i * 2);
+          ctx.stroke();
+        }
+        
+        // Stone wall texture
+        ctx.strokeStyle = '#A0522D';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < house.height; i += 8) {
+          ctx.beginPath();
+          ctx.moveTo(house.x, house.y + i);
+          ctx.lineTo(house.x + house.width, house.y + i);
+          ctx.stroke();
+        }
+        break;
+        
+      case 3: // Japanese Traditional House
+        // Wooden structure
+        ctx.fillStyle = '#DEB887';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+        
+        // Sloped roof with traditional tiles
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.moveTo(house.x - 5, house.y);
+        ctx.lineTo(centerX, house.y - 18);
+        ctx.lineTo(house.x + house.width + 5, house.y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Roof tile pattern
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+          ctx.beginPath();
+          ctx.moveTo(house.x - 5 + i * 6, house.y - i * 2);
+          ctx.lineTo(house.x + house.width + 5 - i * 6, house.y - i * 2);
+          ctx.stroke();
+        }
+        
+        // Wooden beams
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(house.x, house.y + 15);
+        ctx.lineTo(house.x + house.width, house.y + 15);
+        ctx.moveTo(house.x, house.y + 35);
+        ctx.lineTo(house.x + house.width, house.y + 35);
+        ctx.stroke();
+        break;
+        
+      case 4: // Mediterranean Villa
+        // Stucco walls
+        ctx.fillStyle = '#F5F5DC';
+        ctx.fillRect(house.x, house.y, house.width, house.height);
+        
+        // Terracotta roof tiles
+        ctx.fillStyle = '#CD5C5C';
+        ctx.beginPath();
+        ctx.moveTo(house.x - 8, house.y);
+        ctx.lineTo(centerX, house.y - 22);
+        ctx.lineTo(house.x + house.width + 8, house.y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Roof tile detail
+        ctx.strokeStyle = '#8B0000';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 7; i++) {
+          ctx.beginPath();
+          ctx.moveTo(house.x - 8 + i * 5, house.y - i * 2.5);
+          ctx.lineTo(house.x + house.width + 8 - i * 5, house.y - i * 2.5);
+          ctx.stroke();
+        }
+        
+        // Balcony
+        ctx.fillStyle = '#DEB887';
+        ctx.fillRect(house.x + 10, house.y + 15, 20, 8);
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(house.x + 10, house.y + 15, 20, 8);
+        
+        // Balcony railing
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath();
+          ctx.moveTo(house.x + 12 + i * 4, house.y + 15);
+          ctx.lineTo(house.x + 12 + i * 4, house.y + 23);
+          ctx.stroke();
+        }
+        break;
+    }
     
-    // House roof
+    // Realistic doors and windows for each house type
+    let doorX = house.x + 15;
+    let doorY = house.y + 25;
+    let doorWidth = 30;
+    let doorHeight = 35;
+    
+    if (houseType === 1) { // Modern house
+      doorX = house.x + 25;
+      doorY = house.y + 25;
+      doorWidth = 30;
+      doorHeight = 35;
+    } else if (houseType === 2) { // Cottage
+      doorX = house.x + 20;
+      doorY = house.y + 20;
+      doorWidth = 25;
+      doorHeight = 40;
+    } else if (houseType === 3) { // Japanese house
+      doorX = house.x + 20;
+      doorY = house.y + 30;
+      doorWidth = 20;
+      doorHeight = 30;
+    } else if (houseType === 4) { // Mediterranean
+      doorX = house.x + 25;
+      doorY = house.y + 25;
+      doorWidth = 30;
+      doorHeight = 35;
+    }
+    
+    // Realistic door
     ctx.fillStyle = '#8B4513';
-    ctx.fillRect(house.x - 5, house.y - 10, house.width + 10, 10);
-    ctx.strokeRect(house.x - 5, house.y - 10, house.width + 10, 10);
+    ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(doorX, doorY, doorWidth, doorHeight);
     
-    // House door
-    ctx.fillStyle = '#654321';
-    ctx.fillRect(house.x + 15, house.y + 30, 30, 30);
-    ctx.strokeRect(house.x + 15, house.y + 30, 30, 30);
+    // Door handle
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(doorX + doorWidth - 5, doorY + doorHeight/2, 2, 0, Math.PI * 2);
+    ctx.fill();
     
-    // House window
-    ctx.fillStyle = '#87CEEB';
-    ctx.fillRect(house.x + 5, house.y + 10, 15, 15);
-    ctx.strokeRect(house.x + 5, house.y + 10, 15, 15);
+    // Realistic windows (positioned appropriately for each house type)
+    let windowX = house.x + 8;
+    let windowY = house.y + 12;
     
-    // House number
-    ctx.fillStyle = '#000000';
-    ctx.font = '12px VT323';
+    if (houseType === 0) { // Victorian
+      windowX = house.x + 8;
+      windowY = house.y + 12;
+    } else if (houseType === 1) { // Modern (already drawn above)
+      // Windows already drawn in modern house
+    } else if (houseType === 2) { // Cottage
+      windowX = house.x + 10;
+      windowY = house.y + 15;
+    } else if (houseType === 3) { // Japanese
+      windowX = house.x + 8;
+      windowY = house.y + 10;
+    } else if (houseType === 4) { // Mediterranean
+      windowX = house.x + 8;
+      windowY = house.y + 12;
+    }
+    
+    if (houseType !== 1) { // Don't redraw modern windows
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillRect(windowX, windowY, 18, 15);
+      ctx.strokeStyle = '#4682B4';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(windowX, windowY, 18, 15);
+      
+      // Window panes
+      ctx.strokeStyle = '#4682B4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(windowX + 9, windowY);
+      ctx.lineTo(windowX + 9, windowY + 15);
+      ctx.moveTo(windowX, windowY + 7.5);
+      ctx.lineTo(windowX + 18, windowY + 7.5);
+      ctx.stroke();
+    }
+    
+    // House number with realistic style
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 12px Inter';
     ctx.textAlign = 'center';
-    ctx.fillText(house.id + 1, house.x + house.width/2, house.y + 25);
+    let numberY = house.y + 20;
+    if (houseType === 1) numberY = house.y + 18;
+    else if (houseType === 2) numberY = house.y + 18;
+    else if (houseType === 3) numberY = house.y + 20;
+    else if (houseType === 4) numberY = house.y + 18;
+    ctx.fillText(house.id + 1, centerX, numberY);
+    
+    // Realistic architectural details
+    if (houseType === 0) { // Victorian details
+      // Corner stones
+      ctx.fillStyle = '#8B7355';
+      ctx.fillRect(house.x - 2, house.y - 2, 4, 4);
+      ctx.fillRect(house.x + house.width - 2, house.y - 2, 4, 4);
+    } else if (houseType === 2) { // Cottage details
+      // Flower box
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(house.x + 5, house.y + 5, 15, 5);
+      ctx.fillStyle = '#FFB6C1';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(house.x + 8 + i * 4, house.y + 7, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (houseType === 3) { // Japanese details
+      // Lantern
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(house.x + house.width + 5, house.y + 10, 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (houseType === 4) { // Mediterranean details
+      // Shutters
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(house.x - 3, house.y + 12, 3, 15);
+      ctx.fillRect(house.x + house.width, house.y + 12, 3, 15);
+    }
   });
   
   // Draw pee marks
   peeMarks.forEach(mark => {
     ctx.save();
     ctx.translate(mark.x, mark.y);
+    ctx.scale(1.25, 1.25); // 25% larger
     ctx.fillStyle = mark.color;
     ctx.globalAlpha = 0.8;
     ctx.beginPath();
@@ -751,47 +1260,98 @@ function render() {
     ctx.restore();
   });
   
-  // Draw poop mines (for all players)
+  // Draw manga-style poop mines (for all players)
   poopMines.forEach(mine => {
-    // Draw stylized cartoon poop swirl
+    // Draw manga-style poop with clean lines and no face
     ctx.save();
     ctx.translate(mine.x, mine.y);
-    ctx.scale(1.2, 1.2);
-    // Bottom swirl
+    ctx.scale(0.768, 0.768); // 40% smaller total (1.2 * 0.8 * 0.8 = 0.768)
+    
+    // Add subtle sparkle effect
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(-6, -6, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(6, -6, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Bottom swirl with manga-style brown
     ctx.beginPath();
     ctx.arc(0, 8, 10, Math.PI, 2 * Math.PI);
     ctx.arc(0, 8, 10, 0, Math.PI);
     ctx.closePath();
     ctx.fillStyle = '#8B4513';
     ctx.fill();
-    // Middle swirl
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Middle swirl with manga-style shading
     ctx.beginPath();
     ctx.arc(0, 0, 7, Math.PI, 2 * Math.PI);
     ctx.arc(0, 0, 7, 0, Math.PI);
     ctx.closePath();
     ctx.fillStyle = '#A0522D';
     ctx.fill();
-    // Top swirl
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Top swirl with manga-style highlight
     ctx.beginPath();
     ctx.arc(0, -6, 4, Math.PI, 2 * Math.PI);
     ctx.arc(0, -6, 4, 0, Math.PI);
     ctx.closePath();
-    ctx.fillStyle = '#DEB887';
+    ctx.fillStyle = '#CD853F';
     ctx.fill();
-    // Poop tip
+    ctx.strokeStyle = '#A0522D';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Manga-style poop tip
     ctx.beginPath();
     ctx.moveTo(0, -10);
     ctx.lineTo(-2, -14);
     ctx.lineTo(2, -14);
     ctx.closePath();
-    ctx.fillStyle = '#DEB887';
+    ctx.fillStyle = '#CD853F';
     ctx.fill();
+    ctx.strokeStyle = '#A0522D';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Add manga-style highlight
+    ctx.fillStyle = '#DEB887';
+    ctx.beginPath();
+    ctx.arc(-1, -12, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
     ctx.restore();
   });
   
   // Draw other players
-  otherPlayers.forEach(otherPlayer => {
+  console.log('Rendering other players. Count:', otherPlayers.size);
+  
+  // Test: Draw a fixed red circle to see if rendering works
+  ctx.save();
+  ctx.fillStyle = 'red';
+  ctx.beginPath();
+  ctx.arc(400, 300, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  
+  otherPlayers.forEach((otherPlayer, id) => {
+    console.log('Other player:', otherPlayer.name, 'alive:', otherPlayer.isAlive, 'at', otherPlayer.x, otherPlayer.y);
     if (otherPlayer.isAlive) {
+      // Draw a visible marker first to test
+      ctx.save();
+      ctx.fillStyle = 'blue';
+      ctx.beginPath();
+      ctx.arc(otherPlayer.x, otherPlayer.y, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      
       drawDog(otherPlayer.x, otherPlayer.y, otherPlayer.color, otherPlayer.name, false, otherPlayer.breed);
     }
   });
@@ -808,125 +1368,259 @@ function render() {
 // Draw a dog
 function drawDog(x, y, color, name, isCurrentPlayer, breed) {
   ctx.save();
-  // Body
+  
+  // Breed-specific rendering
+  switch(breed) {
+    case 'Shiba':
+      drawShiba(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Beagle':
+      drawBeagle(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Bassotto':
+      drawDachshund(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Bulldog':
+      drawBulldog(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Barboncino':
+      drawPoodle(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Golden Retriever':
+      drawGoldenRetriever(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Labrador':
+      drawLabrador(x, y, color, name, isCurrentPlayer);
+      break;
+    case 'Chihuahua':
+      drawChihuahua(x, y, color, name, isCurrentPlayer);
+      break;
+    default:
+      drawGoldenRetriever(x, y, color, name, isCurrentPlayer);
+  }
+  
+  ctx.restore();
+}
+
+// Golden Retriever - cute, fluffy, floppy ear, longer body
+function drawGoldenRetriever(x, y, color, name, isCurrentPlayer) {
   ctx.fillStyle = color;
-  ctx.strokeStyle = '#000'; // Always black outline
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(x, y + 4, 12, 9, 0, 0, Math.PI * 2); // body
-  ctx.fill();
-  ctx.stroke();
-
-  // Head
-  ctx.beginPath();
-  ctx.ellipse(x, y - 8, 8, 7, 0, 0, Math.PI * 2); // head
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.stroke();
-
-  // Snout
-  ctx.beginPath();
-  ctx.ellipse(x, y - 3, 4, 2.5, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#fffbe6';
-  ctx.fill();
-  ctx.stroke();
-
-  // Nose
-  ctx.beginPath();
-  ctx.arc(x, y - 5, 1.2, 0, Math.PI * 2);
-  ctx.fillStyle = '#222';
-  ctx.fill();
-
-  // Eyes
-  ctx.beginPath();
-  ctx.arc(x - 3, y - 9, 1, 0, Math.PI * 2);
-  ctx.arc(x + 3, y - 9, 1, 0, Math.PI * 2);
-  ctx.fillStyle = '#222';
-  ctx.fill();
-
-  // Mouth
-  ctx.beginPath();
-  ctx.arc(x, y - 4, 1.2, 0, Math.PI);
   ctx.strokeStyle = '#222';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Ears
-  ctx.beginPath();
-  ctx.moveTo(x - 6, y - 14);
-  ctx.lineTo(x - 10, y - 18);
-  ctx.lineTo(x - 3, y - 12);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(x + 6, y - 14);
-  ctx.lineTo(x + 10, y - 18);
-  ctx.lineTo(x + 3, y - 12);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-
-  // Tail
-  ctx.beginPath();
-  ctx.moveTo(x + 12, y + 4);
-  ctx.quadraticCurveTo(x + 18, y + 2, x + 14, y - 6);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.stroke();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-
-  // Legs (simple lines)
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
+  // Fluffy, slightly longer body
   ctx.beginPath();
-  ctx.moveTo(x - 6, y + 12);
-  ctx.lineTo(x - 6, y + 18);
-  ctx.moveTo(x - 2, y + 12);
-  ctx.lineTo(x - 2, y + 18);
-  ctx.moveTo(x + 2, y + 12);
-  ctx.lineTo(x + 2, y + 18);
-  ctx.moveTo(x + 6, y + 12);
-  ctx.lineTo(x + 6, y + 18);
-  ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#000';
+  ctx.ellipse(x + 7, y + 6, 10, 5, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Big, round head
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(x - 6, y + 12);
-  ctx.lineTo(x - 6, y + 18);
-  ctx.moveTo(x - 2, y + 12);
-  ctx.lineTo(x - 2, y + 18);
-  ctx.moveTo(x + 2, y + 12);
-  ctx.lineTo(x + 2, y + 18);
-  ctx.moveTo(x + 6, y + 12);
-  ctx.lineTo(x + 6, y + 18);
-  ctx.stroke();
+  ctx.ellipse(x - 4, y - 4, 7, 7, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Fluffy snout
+  ctx.fillStyle = '#FFF8DC';
+  ctx.beginPath();
+  ctx.ellipse(x - 10, y - 1, 2.2, 1.2, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Large, expressive eye
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(x - 5, y - 6, 1.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.7, y - 6.3, 0.3, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 11.5, y - 1, 0.6, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 9, y + 1, 0.7, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Floppy ear
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x - 7, y - 10); ctx.quadraticCurveTo(x - 14, y - 16, x - 3, y - 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Fluffy tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x + 15, y + 6); ctx.quadraticCurveTo(x + 20, y + 2, x + 16, y - 2); ctx.stroke();
+  // Short, chubby legs
+  ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 2, y + 10); ctx.lineTo(x + 2, y + 15); ctx.moveTo(x + 7, y + 10); ctx.lineTo(x + 7, y + 15); ctx.moveTo(x + 11, y + 10); ctx.lineTo(x + 11, y + 15); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Golden Retriever');
+}
 
-  // Player name and breed
+// Shiba Inu - cute, pointy ear, curled tail, white face/chest
+function drawShiba(x, y, color, name, isCurrentPlayer) {
+  // Orange/tan body
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 4, y + 6, 7, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // White chest
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + 2, y + 7, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // Big, round head
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 3, y - 3, 6, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // White face
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 4, y - 3, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // Pointy ear
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 5, y - 8); ctx.lineTo(x - 8, y - 12); ctx.lineTo(x - 2, y - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Curled tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 10, y + 6); ctx.quadraticCurveTo(x + 14, y + 4, x + 11, y + 2); ctx.stroke();
+  // Eye
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 4, y - 5, 1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 3.7, y - 5.3, 0.25, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 9, y - 1, 0.5, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 7, y + 1, 0.5, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Short legs
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 1, y + 10); ctx.lineTo(x + 1, y + 14); ctx.moveTo(x + 4, y + 10); ctx.lineTo(x + 4, y + 14); ctx.moveTo(x + 7, y + 10); ctx.lineTo(x + 7, y + 14); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Shiba');
+}
+
+// Beagle - cute, floppy ear, tricolor patches
+function drawBeagle(x, y, color, name, isCurrentPlayer) {
+  // Brown body
+  ctx.fillStyle = '#b97a56'; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 4, y + 6, 7.5, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Black patch
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.ellipse(x + 7, y + 6, 2, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+  // White chest
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + 2, y + 7, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // Big, round head
+  ctx.fillStyle = '#b97a56'; ctx.beginPath(); ctx.ellipse(x - 3, y - 4, 6.5, 6.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // White snout
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 8, y - 1, 2, 1, 0, 0, Math.PI * 2); ctx.fill();
+  // Floppy ear
+  ctx.fillStyle = '#b97a56'; ctx.beginPath(); ctx.moveTo(x - 6, y - 8); ctx.lineTo(x - 10, y - 12); ctx.lineTo(x - 2, y - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Short tail
+  ctx.strokeStyle = '#b97a56'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 11, y + 6); ctx.lineTo(x + 15, y + 4); ctx.stroke();
+  // Eye
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 4, y - 6, 1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 3.7, y - 6.3, 0.25, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 10, y - 1, 0.5, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 8, y + 1, 0.5, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Short legs
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 1, y + 10); ctx.lineTo(x + 1, y + 15); ctx.moveTo(x + 4, y + 10); ctx.lineTo(x + 4, y + 15); ctx.moveTo(x + 7, y + 10); ctx.lineTo(x + 7, y + 15); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Beagle');
+}
+
+// Labrador - cute, floppy ear, thick tail, solid color
+function drawLabrador(x, y, color, name, isCurrentPlayer) {
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 5, y + 6, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 4, y - 4, 7, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 10, y - 1, 2.2, 1.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 5, y - 6, 1.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.7, y - 6.3, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 11.5, y - 1, 0.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 9, y + 1, 0.7, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 7, y - 10); ctx.quadraticCurveTo(x - 12, y - 14, x - 3, y - 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 12, y + 6); ctx.quadraticCurveTo(x + 16, y + 4, x + 13, y + 1); ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 1, y + 10); ctx.lineTo(x + 1, y + 15); ctx.moveTo(x + 5, y + 10); ctx.lineTo(x + 5, y + 15); ctx.moveTo(x + 8, y + 10); ctx.lineTo(x + 8, y + 15); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Labrador');
+}
+
+// Chihuahua - cute, big upright ear, tiny body
+function drawChihuahua(x, y, color, name, isCurrentPlayer) {
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 2, y + 6, 5, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 3, y - 3, 4.5, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 7, y - 1, 1.3, 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 4, y - 4, 0.8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 3.8, y - 4.2, 0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 7.8, y - 1, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 6, y + 1, 0.3, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x - 12, y - 13); ctx.lineTo(x - 2, y - 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 7, y + 6); ctx.lineTo(x + 11, y + 4); ctx.stroke();
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 1, y + 9); ctx.lineTo(x + 1, y + 13); ctx.moveTo(x + 3, y + 9); ctx.lineTo(x + 3, y + 13); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Chihuahua');
+}
+
+// Husky - cute, pointy ear, bushy tail, mask
+function drawHusky(x, y, color, name, isCurrentPlayer) {
+  // Gray body
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 5, y + 6, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Big, round head
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 4, y - 4, 7, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // White mask
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 4, y - 4, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // Pointy ear
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 7, y - 10); ctx.lineTo(x - 12, y - 14); ctx.lineTo(x - 3, y - 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Bushy tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 12, y + 6); ctx.quadraticCurveTo(x + 16, y + 4, x + 13, y + 1); ctx.stroke();
+  // Blue eye
+  ctx.fillStyle = '#4A90E2'; ctx.beginPath(); ctx.arc(x - 5, y - 6, 1.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.7, y - 6.3, 0.3, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 11.5, y - 1, 0.6, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 9, y + 1, 0.7, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Short, chubby legs
+  ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 1, y + 10); ctx.lineTo(x + 1, y + 15); ctx.moveTo(x + 5, y + 10); ctx.lineTo(x + 5, y + 15); ctx.moveTo(x + 8, y + 10); ctx.lineTo(x + 8, y + 15); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Husky');
+}
+
+// Poodle - cute, fluffy head/ears/tail, dainty legs
+function drawPoodle(x, y, color, name, isCurrentPlayer) {
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 4, y + 6, 7, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 3, y - 3, 6, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Fluffy head
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 3, y - 6, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // Fluffy ear
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 5, y - 8); ctx.lineTo(x - 8, y - 12); ctx.lineTo(x - 2, y - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Fluffy tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 10, y + 6); ctx.lineTo(x + 14, y + 4); ctx.stroke();
+  // Eye
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 4, y - 5, 1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 3.7, y - 5.3, 0.25, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 9, y - 1, 0.5, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 7, y + 1, 0.5, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Dainty legs
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 1, y + 10); ctx.lineTo(x + 1, y + 15); ctx.moveTo(x + 4, y + 10); ctx.lineTo(x + 4, y + 15); ctx.moveTo(x + 7, y + 10); ctx.lineTo(x + 7, y + 15); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Poodle');
+}
+
+// Bulldog - cute, stocky, wrinkly face, small floppy ear
+function drawBulldog(x, y, color, name, isCurrentPlayer) {
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 4, y + 7, 8, 5.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 4, y - 3, 7, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Wrinkly face
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 7, y - 6); ctx.lineTo(x - 2, y - 4); ctx.stroke();
+  // Small floppy ear
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 7, y - 8); ctx.lineTo(x - 12, y - 12); ctx.lineTo(x - 3, y - 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Short tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 12, y + 7); ctx.lineTo(x + 16, y + 5); ctx.stroke();
+  // Eye
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 5, y - 4, 1.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.7, y - 4.3, 0.3, 0, Math.PI * 2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 11.5, y, 0.6, 0, Math.PI * 2); ctx.fill();
+  // Smile
+  ctx.beginPath(); ctx.arc(x - 9, y + 2, 0.7, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  // Short, chubby legs
+  ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 1, y + 12); ctx.lineTo(x + 1, y + 16); ctx.moveTo(x + 5, y + 12); ctx.lineTo(x + 5, y + 16); ctx.moveTo(x + 8, y + 12); ctx.lineTo(x + 8, y + 16); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Bulldog');
+}
+
+// Dachshund - cute, long body, long floppy ear, short legs
+function drawDachshund(x, y, color, name, isCurrentPlayer) {
+  ctx.fillStyle = color; ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x + 10, y + 6, 13, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x - 6, y - 3, 6, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x - 13, y - 1, 2.5, 1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 8, y - 4, 0.8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 7.7, y - 4.2, 0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 14.5, y - 1, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 12, y + 1, 0.3, 0, Math.PI); ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x - 10, y - 7); ctx.lineTo(x - 15, y - 11); ctx.lineTo(x - 3, y - 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 20, y + 6); ctx.lineTo(x + 26, y + 4); ctx.stroke();
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 4, y + 9); ctx.lineTo(x + 4, y + 13); ctx.moveTo(x + 8, y + 9); ctx.lineTo(x + 8, y + 13); ctx.moveTo(x + 12, y + 9); ctx.lineTo(x + 12, y + 13); ctx.stroke();
+  drawDogNameAndBreed(x, y, name, isCurrentPlayer, 'Dachshund');
+}
+
+// Helper function for name and breed display
+function drawDogNameAndBreed(x, y, name, isCurrentPlayer, breed) {
+  // Player name only
   ctx.fillStyle = '#000'; // Always black name
   ctx.font = '12px VT323';
   ctx.textAlign = 'center';
-  ctx.fillText(
-    name,
-    x, y - 25
-  );
-  ctx.font = '10px VT323';
-  ctx.fillStyle = '#888';
-  ctx.fillText(breed, x, y - 14);
+  ctx.fillText(name, x, y - 20);
 
   // Current player indicator
   if (isCurrentPlayer) {
     ctx.fillStyle = '#00ff00';
-    ctx.fillRect(x - 2, y - 35, 4, 4);
+    ctx.fillRect(x - 2, y - 30, 4, 4);
   }
-  ctx.restore();
 }
 
 // Draw command overlay
@@ -934,42 +1628,8 @@ function drawCommandOverlay() {
   // Reset transform for UI overlay
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   
-  // Draw control buttons on the right side
-  const buttonWidth = 120;
-  const buttonHeight = 40;
-  const buttonSpacing = 10;
-  const startX = canvas.width - buttonWidth - 20;
-  const startY = 20;
-  
-  const buttons = [
-    { text: '📊 Leaderboard', action: 'leaderboard', y: startY }
-  ];
-  
-  // Store button positions for click detection
-  window.gameButtons = buttons.map(btn => ({
-    x: startX,
-    y: btn.y,
-    width: buttonWidth,
-    height: buttonHeight,
-    action: btn.action
-  }));
-  
-  buttons.forEach(btn => {
-    // Button background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(startX, btn.y, buttonWidth, buttonHeight);
-    
-    // Button border
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(startX, btn.y, buttonWidth, buttonHeight);
-    
-    // Button text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '14px VT323';
-    ctx.textAlign = 'center';
-    ctx.fillText(btn.text, startX + buttonWidth/2, btn.y + buttonHeight/2 + 5);
-  });
+  // No buttons to draw - leaderboard button removed
+  window.gameButtons = [];
 }
 
 // Initialize game when page loads

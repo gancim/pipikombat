@@ -299,7 +299,25 @@ io.on('connection', (socket) => {
       console.log('Generated new Little Town map');
     }
     
-    const selectedHouse = gameState.townMap.houses[playerCount % gameState.townMap.houses.length];
+    // Assign unique houses to players
+    const availableHouses = gameState.townMap.houses.filter(house => {
+      // Check if any existing player is using this house
+      for (const [existingId, existingPlayer] of gameState.players) {
+        const existingHouse = gameState.townMap.houses.find(h => 
+          h.x === existingPlayer.x - HOUSE_SIZE / 2 && 
+          h.y === existingPlayer.y - HOUSE_SIZE / 2
+        );
+        if (existingHouse && existingHouse.id === house.id) {
+          return false; // House is taken
+        }
+      }
+      return true; // House is available
+    });
+    
+    // If no unique houses available, use the next house in sequence
+    const selectedHouse = availableHouses.length > 0 
+      ? availableHouses[0] 
+      : gameState.townMap.houses[playerCount % gameState.townMap.houses.length];
     // Use client-provided breed and color if available
     const breed = data.breed || DOG_BREEDS[playerCount % DOG_BREEDS.length].name;
     const color = data.color || DOG_BREEDS[playerCount % DOG_BREEDS.length].color;
@@ -324,6 +342,11 @@ io.on('connection', (socket) => {
       respawnTime: 0
     };
 
+    // Store existing players before adding the new one
+    const existingPlayers = Array.from(gameState.players.values());
+    console.log('New player joining. Existing players count:', existingPlayers.length);
+    existingPlayers.forEach(p => console.log('Existing player:', p.name, 'at', p.x, p.y));
+    
     gameState.players.set(socket.id, player);
     
     console.log('Emitting gameJoined with townMap:', gameState.townMap);
@@ -333,6 +356,16 @@ io.on('connection', (socket) => {
       mapWidth: MAP_WIDTH,
       mapHeight: MAP_HEIGHT,
       gameTime: gameState.gameTime
+    });
+
+    // Send existing players to the new player
+    console.log('Sending existing players to new player. Total existing players:', existingPlayers.length);
+    existingPlayers.forEach(existingPlayer => {
+      console.log('Sending existing player to new player:', existingPlayer.name, 'at', existingPlayer.x, existingPlayer.y);
+      socket.emit('playerJoined', {
+        player: existingPlayer,
+        totalPlayers: gameState.players.size
+      });
     });
 
     io.emit('playerJoined', {
