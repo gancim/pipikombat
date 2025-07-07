@@ -30,6 +30,12 @@ const ctx = canvas.getContext('2d');
 const BASE_WIDTH = 800;
 const BASE_HEIGHT = 600;
 
+// Scaling variables for full-screen support
+let scaleX = 1;
+let scaleY = 1;
+let offsetX = 0;
+let offsetY = 0;
+
 // Add roundRect polyfill for kawaii rounded corners
 if (!ctx.roundRect) {
   ctx.roundRect = function(x, y, width, height, radius) {
@@ -48,12 +54,43 @@ if (!ctx.roundRect) {
 }
 
 function resizeCanvas() {
-  // Calculate the largest size that fits in the window while preserving aspect ratio
-  const scale = Math.min(window.innerWidth / BASE_WIDTH, window.innerHeight / BASE_HEIGHT);
-  canvas.width = BASE_WIDTH;
-  canvas.height = BASE_HEIGHT;
-  canvas.style.width = `${BASE_WIDTH * scale}px`;
-  canvas.style.height = `${BASE_HEIGHT * scale}px`;
+  // Make canvas fill the entire available space
+  const gameArea = document.querySelector('.game-area');
+  if (gameArea) {
+    const rect = gameArea.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    
+    // Calculate scaling to fit the game world
+    scaleX = canvas.width / BASE_WIDTH;
+    scaleY = canvas.height / BASE_HEIGHT;
+    
+    // Use the smaller scale to maintain aspect ratio
+    const scale = Math.min(scaleX, scaleY);
+    scaleX = scale;
+    scaleY = scale;
+    
+    // Calculate centering offsets
+    offsetX = (canvas.width - BASE_WIDTH * scale) / 2;
+    offsetY = (canvas.height - BASE_HEIGHT * scale) / 2;
+  } else {
+    // Fallback to window size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    
+    scaleX = canvas.width / BASE_WIDTH;
+    scaleY = canvas.height / BASE_HEIGHT;
+    const scale = Math.min(scaleX, scaleY);
+    scaleX = scale;
+    scaleY = scale;
+    
+    offsetX = (canvas.width - BASE_WIDTH * scale) / 2;
+    offsetY = (canvas.height - BASE_HEIGHT * scale) / 2;
+  }
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -275,6 +312,40 @@ function initGame() {
   
   // Start game loop
   gameLoop();
+  
+  // Handle logo loading
+  const logo = document.querySelector('.game-logo');
+  const loading = document.querySelector('.logo-loading');
+  const fallback = document.querySelector('.fallback-title');
+  
+  if (logo) {
+    // Show loading initially
+    if (loading) {
+      loading.style.display = 'block';
+    }
+    
+    logo.addEventListener('load', () => {
+      console.log('Logo loaded successfully');
+      logo.style.display = 'block';
+      if (loading) {
+        loading.style.display = 'none';
+      }
+      if (fallback) {
+        fallback.style.display = 'none';
+      }
+    });
+    
+    logo.addEventListener('error', () => {
+      console.log('Logo failed to load, showing fallback');
+      logo.style.display = 'none';
+      if (loading) {
+        loading.style.display = 'none';
+      }
+      if (fallback) {
+        fallback.style.display = 'block';
+      }
+    });
+  }
 }
 
 // Add breed and color selection logic
@@ -465,6 +536,8 @@ function showGameScreen() {
     gameScreen.classList.add('glitch');
     setTimeout(() => {
       gameScreen.classList.remove('glitch');
+      // Resize canvas for full screen after transition
+      resizeCanvas();
     }, 300);
   }, 200);
   
@@ -790,18 +863,18 @@ function updateTimer() {
 
 // Render game
 function render() {
-  // Responsive scaling: always fit the map
+  // Full screen rendering with proper scaling
   ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-  const scale = Math.min(window.innerWidth / BASE_WIDTH, window.innerHeight / BASE_HEIGHT);
-  ctx.scale(scale, scale);
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scaleX, scaleY);
   console.log('Rendering, townMap:', townMap);
   
   // Clear canvas with kawaii pastel background
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  const gradient = ctx.createLinearGradient(0, 0, 0, BASE_HEIGHT);
   gradient.addColorStop(0, '#FFE5F1'); // Soft pink sky
   gradient.addColorStop(1, '#E8F4FD'); // Soft blue ground
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
   
   if (!townMap) return;
   
@@ -1333,25 +1406,9 @@ function render() {
   // Draw other players
   console.log('Rendering other players. Count:', otherPlayers.size);
   
-  // Test: Draw a fixed red circle to see if rendering works
-  ctx.save();
-  ctx.fillStyle = 'red';
-  ctx.beginPath();
-  ctx.arc(400, 300, 20, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  
   otherPlayers.forEach((otherPlayer, id) => {
     console.log('Other player:', otherPlayer.name, 'alive:', otherPlayer.isAlive, 'at', otherPlayer.x, otherPlayer.y);
     if (otherPlayer.isAlive) {
-      // Draw a visible marker first to test
-      ctx.save();
-      ctx.fillStyle = 'blue';
-      ctx.beginPath();
-      ctx.arc(otherPlayer.x, otherPlayer.y, 15, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      
       drawDog(otherPlayer.x, otherPlayer.y, otherPlayer.color, otherPlayer.name, false, otherPlayer.breed);
     }
   });
