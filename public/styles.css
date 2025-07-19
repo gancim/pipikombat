@@ -391,6 +391,25 @@ html, body {
   text-shadow: none;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 }
+
+/* Enhanced battle result styling */
+.battle-win {
+  color: #22c55e !important;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.battle-loss {
+  color: #ef4444 !important;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.battle-draw {
+  color: #f59e0b !important;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
 .modal {
   position: fixed;
   top: 0; left: 0;
@@ -528,29 +547,111 @@ html, body {
   box-shadow: 0 0 8px #e3e8ee;
   transition: all 0.15s;
   outline: none;
-  min-width: 70px;
-  min-height: 70px;
+  min-width: 120px;
+  min-height: 80px;
   text-align: center;
   line-height: 1.1;
   touch-action: manipulation;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  position: relative;
+  overflow: visible;
+  z-index: 100;
 }
-.rps-btn:hover, .rps-btn.selected {
+.rps-btn:hover {
   background: #eaf3ff;
   color: #222;
   border-color: #4f8cff;
   box-shadow: 0 0 12px #4f8cff;
-  transform: scale(1.08);
+  transform: scale(1.05);
+  cursor: pointer;
+}
+.rps-btn:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+.rps-btn.selected {
+  background: linear-gradient(135deg, #4f8cff, #6ba3ff);
+  color: #fff;
+  border-color: #4f8cff;
+  box-shadow: 0 0 20px #4f8cff, 0 4px 12px rgba(79, 140, 255, 0.3);
+  transform: scale(1.1);
+  animation: rps-selected-pulse 1.5s ease-in-out infinite;
+  position: relative;
+}
+.rps-btn.selected::before {
+  content: "✓";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #22c55e;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+  animation: checkmark-bounce 0.6s ease-out;
+}
+.rps-btn.selected::after {
+  content: "YOUR CHOICE";
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4f8cff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(79, 140, 255, 0.3);
+  animation: choice-label-fade 0.5s ease-out;
+}
+@keyframes rps-selected-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px #4f8cff, 0 4px 12px rgba(79, 140, 255, 0.3);
+    transform: scale(1.1);
+  }
+  50% { 
+    box-shadow: 0 0 30px #4f8cff, 0 6px 16px rgba(79, 140, 255, 0.5);
+    transform: scale(1.15);
+  }
+}
+@keyframes checkmark-bounce {
+  0% { 
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  50% { 
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+  100% { 
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+@keyframes choice-label-fade {
+  0% { 
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 @keyframes rps-flash {
   0% { box-shadow: 0 0 0 #4f8cff; }
   50% { box-shadow: 0 0 24px #4f8cff, 0 0 8px #fff; }
   100% { box-shadow: 0 0 0 #4f8cff; }
-}
-.rps-btn.selected {
-  animation: rps-flash 0.5s;
 }
 #battleRPSModal .modal-content {
   background: #fff;
@@ -570,10 +671,29 @@ html, body {
   color: #222;
   margin-bottom: 8px;
 }
+.rps-instructions {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 12px;
+  text-align: center;
+  font-style: italic;
+}
 #battleRPSCountdown {
   font-size: 1.3em;
   color: #4f8cff;
   margin-top: 8px;
+  font-weight: bold;
+  animation: countdown-pulse 1s ease-in-out infinite;
+}
+@keyframes countdown-pulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 /* Mobile Touch Controls */
@@ -704,8 +824,20 @@ html, body {
   .rps-btn {
     font-size: 1.8em;
     padding: 14px 18px;
-    min-width: 60px;
-    min-height: 60px;
+    min-width: 100px;
+    min-height: 70px;
+  }
+  .rps-btn.selected::before {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    top: -6px;
+    right: -6px;
+  }
+  .rps-btn.selected::after {
+    font-size: 9px;
+    padding: 3px 6px;
+    bottom: -25px;
   }
   .modal-logo-img {
     height: 40px;
@@ -779,8 +911,20 @@ html, body {
   .rps-btn {
     font-size: 1.5em;
     padding: 12px 16px;
-    min-width: 50px;
-    min-height: 50px;
+    min-width: 90px;
+    min-height: 65px;
+  }
+  .rps-btn.selected::before {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    top: -5px;
+    right: -5px;
+  }
+  .rps-btn.selected::after {
+    font-size: 8px;
+    padding: 2px 5px;
+    bottom: -22px;
   }
   .mobile-control-btn {
     width: 50px;
@@ -843,5 +987,84 @@ html, body {
   textarea,
   input {
     font-size: 16px;
+  }
+}
+
+/* Waiting Overlay Styles */
+.waiting-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.waiting-overlay.hidden {
+  display: none;
+}
+
+.waiting-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+}
+
+.waiting-spinner {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.waiting-content h3 {
+  font-size: 1.5rem;
+  color: #4f8cff;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.waiting-message {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.waiting-hint {
+  font-size: 0.9rem;
+  color: #888;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .waiting-content {
+    padding: 24px;
+    margin: 20px;
+  }
+  
+  .waiting-spinner {
+    font-size: 2.5rem;
+  }
+  
+  .waiting-content h3 {
+    font-size: 1.3rem;
+  }
+  
+  .waiting-message {
+    font-size: 1rem;
   }
 } 

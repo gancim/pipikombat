@@ -21,7 +21,7 @@
                     <div class="game-description">
                         <p>Mark territory with pee, avoid poop mines, and dominate the leaderboard!</p>
                         <p>Return to houses to recharge your pee meter</p>
-                        <p>Hug other dogs to recover health</p>
+
                         <p>Rock-paper-scissors battles when dogs collide</p>
                     </div>
                     <div class="join-form">
@@ -74,7 +74,7 @@
                             <li><strong>WASD</strong> or <strong>Arrow Keys</strong> - Move</li>
                             <li><strong>Space</strong> - Pee (mark territory)</li>
                             <li><strong>P</strong> - Poop (place mine)</li>
-                            <li><strong>C</strong> - Hug nearby dogs</li>
+
                         </ul>
                         <p style="margin-top: 12px; font-size: 0.9rem; color: #666;"><strong>Mobile:</strong> Use touch controls below the game</p>
                     </div>
@@ -115,12 +115,7 @@
                             <p>Battle results will appear here</p>
                         </div>
                     </div>
-                    <div id="cuddleNotification" class="cuddle-notification hidden">
-                        <div class="cuddle-content">
-                            <h3>Hug Success!</h3>
-                            <p>Recovered health with a hug!</p>
-                        </div>
-                    </div>
+
                     <div id="poopNotification" class="poop-notification hidden">
                         <div class="poop-content">
                             <h3>Poop Mine!</h3>
@@ -131,12 +126,23 @@
                         <div class="modal-content">
                             <h2>Rock-Paper-Scissors Battle!</h2>
                             <div id="battleRPSMessage">Battling opponent...</div>
-                            <div style="margin:18px 0;display:flex;justify-content:center;gap:18px;">
+                            <div class="rps-instructions">Click your choice below:</div>
+                            <div style="margin:18px 0;display:flex;flex-direction:column;align-items:center;gap:12px;">
                                 <button class="rps-btn" data-choice="rock">✊<br>Rock</button>
                                 <button class="rps-btn" data-choice="paper">✋<br>Paper</button>
                                 <button class="rps-btn" data-choice="scissors">✌️<br>Scissors</button>
                             </div>
                             <div id="battleRPSCountdown">5</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Waiting for Players Overlay -->
+                    <div id="waitingOverlay" class="waiting-overlay hidden">
+                        <div class="waiting-content">
+                            <div class="waiting-spinner">⏳</div>
+                            <h3>Waiting for Players</h3>
+                            <p class="waiting-message">Waiting for more players to join...</p>
+                            <p class="waiting-hint">You can explore the world while waiting!</p>
                         </div>
                     </div>
                 </div>
@@ -146,7 +152,7 @@
             <div class="mobile-controls">
                 <button class="mobile-control-btn pee-btn" id="mobilePeeBtn" title="Pee (Mark Territory)">💧</button>
                 <button class="mobile-control-btn poop-btn" id="mobilePoopBtn" title="Poop (Place Mine)">💩</button>
-                <button class="mobile-control-btn hug-btn" id="mobileHugBtn" title="Hug Nearby Dogs">🤗</button>
+
                 <button class="mobile-control-btn leaderboard-btn" id="mobileLeaderboardBtn" title="Leaderboard">📊</button>
             </div>
         </div>

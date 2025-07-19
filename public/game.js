@@ -11,7 +11,7 @@ let gameTime = 5 * 60; // 5 minutes
 let keys = {};
 let lastPeeTime = 0;
 let lastPoopTime = 0;
-let lastCuddleTime = 0;
+
 
 // Mobile touch state
 let touchStartX = 0;
@@ -112,7 +112,7 @@ const gameOverContent = document.getElementById('gameOverContent');
 // Mobile control buttons
 const mobilePeeBtn = document.getElementById('mobilePeeBtn');
 const mobilePoopBtn = document.getElementById('mobilePoopBtn');
-const mobileHugBtn = document.getElementById('mobileHugBtn');
+
 const mobileLeaderboardBtn = document.getElementById('mobileLeaderboardBtn');
 
 // Dog emojis for different breeds
@@ -142,24 +142,82 @@ function showRPSBattle(battleId, opponentName) {
   let timeLeft = 5;
   let picked = false;
   const buttons = Array.from(document.querySelectorAll('.rps-btn'));
-  buttons.forEach(btn => btn.classList.remove('selected'));
+  
+  // Clear any previous selections
+  buttons.forEach(btn => {
+    btn.classList.remove('selected');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  });
 
   function pick(choice) {
-    if (picked) return;
-    picked = true;
-    buttons.forEach(btn => btn.disabled = true);
-    // Only add .selected to the picked button
-    const btn = buttons.find(b => b.dataset.choice === choice);
-    if (btn) {
-      btn.classList.add('selected');
-      console.log('RPS selected:', choice, btn);
+    console.log('pick function called with choice:', choice);
+    if (picked) {
+      console.log('Already picked, returning');
+      return;
     }
-    window.socket.emit('battleChoice', { battleId, choice });
+    picked = true;
+    
+    // Disable all buttons
+    buttons.forEach(btn => {
+      btn.disabled = true;
+      if (btn.dataset.choice !== choice) {
+        btn.style.opacity = '0.5';
+      }
+    });
+    
+    // Add selection to the picked button
+    const selectedBtn = buttons.find(b => b.dataset.choice === choice);
+    if (selectedBtn) {
+      selectedBtn.classList.add('selected');
+      selectedBtn.style.opacity = '1';
+      
+      // Update message to show selection
+      msg.textContent = `You chose ${choice.toUpperCase()}! Waiting for ${opponentName}...`;
+      
+      // Add visual feedback to the modal
+      const battleModal = document.getElementById('battleRPSModal');
+      battleModal.style.border = '3px solid #22c55e';
+      battleModal.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.3)';
+      
+      // Add a small delay before sending to show the selection
+      setTimeout(() => {
+        window.socket.emit('battleChoice', { battleId, choice });
+      }, 300);
+      
+      console.log('RPS selected:', choice, selectedBtn);
+    }
   }
 
   buttons.forEach(btn => {
-    btn.disabled = false;
-    btn.onclick = () => pick(btn.dataset.choice);
+    console.log('Setting up button:', btn.dataset.choice);
+    
+    // Remove any existing event listeners
+    if (btn._rpsClickHandler) {
+      btn.removeEventListener('click', btn._rpsClickHandler);
+    }
+    
+    // Create new event handler
+    btn._rpsClickHandler = () => {
+      console.log('Button clicked:', btn.dataset.choice);
+      pick(btn.dataset.choice);
+    };
+    btn.addEventListener('click', btn._rpsClickHandler);
+    
+    // Also add touch events for mobile
+    if (btn._rpsTouchHandler) {
+      btn.removeEventListener('touchstart', btn._rpsTouchHandler);
+    }
+    btn._rpsTouchHandler = (e) => {
+      e.preventDefault();
+      console.log('Button touched:', btn.dataset.choice);
+      pick(btn.dataset.choice);
+    };
+    btn.addEventListener('touchstart', btn._rpsTouchHandler);
+    
+    // Ensure button is clickable
+    btn.style.pointerEvents = 'auto';
+    btn.style.cursor = 'pointer';
   });
 
   rpsTimeout = setInterval(() => {
@@ -170,6 +228,7 @@ function showRPSBattle(battleId, opponentName) {
       if (!picked) {
         // Auto-pick random
         const random = ['rock','paper','scissors'][Math.floor(Math.random()*3)];
+        console.log('Auto-picking random choice:', random);
         pick(random);
       }
     }
@@ -180,10 +239,40 @@ function hideRPSBattle() {
   const modal = document.getElementById('battleRPSModal');
   modal.classList.add('hidden');
   if (rpsTimeout) clearInterval(rpsTimeout);
-  // Remove .selected from all buttons
+  
+  // Clean up all button states
   const buttons = Array.from(document.querySelectorAll('.rps-btn'));
-  buttons.forEach(btn => btn.classList.remove('selected'));
+  buttons.forEach(btn => {
+    btn.classList.remove('selected');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  });
+  
+  // Reset modal styling
+  const battleModal = document.getElementById('battleRPSModal');
+  if (battleModal) {
+    battleModal.style.border = '';
+    battleModal.style.boxShadow = '';
+  }
+  
   currentBattleId = null;
+}
+
+// Test function for debugging RPS buttons
+function testRPSButtons() {
+  console.log('Testing RPS buttons...');
+  const buttons = Array.from(document.querySelectorAll('.rps-btn'));
+  console.log('Found buttons:', buttons.length);
+  buttons.forEach(btn => {
+    console.log('Button:', btn.dataset.choice, 'Clickable:', btn.style.pointerEvents, 'Cursor:', btn.style.cursor);
+    console.log('Button rect:', btn.getBoundingClientRect());
+  });
+}
+
+// Test function to manually trigger RPS battle
+function testRPSBattle() {
+  console.log('Testing RPS battle...');
+  showRPSBattle('test-battle-123', 'Test Opponent');
 }
 
 // Mobile touch controls
@@ -211,16 +300,7 @@ function setupMobileControls() {
     });
   }
   
-  if (mobileHugBtn) {
-    mobileHugBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      cuddle();
-    });
-    mobileHugBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      cuddle();
-    });
-  }
+
   
   if (mobileLeaderboardBtn) {
     mobileLeaderboardBtn.addEventListener('touchstart', (e) => {
@@ -397,14 +477,23 @@ function setupBreedAndColorSelection() {
 function setupSocketEvents() {
   socket.on('gameJoined', (data) => {
     player = data.player;
+    player.poopCount = 0; // Initialize poop count
     townMap = data.townMap;
     updatePlayerDisplay();
-    showGameScreen();
+    showGameScreen(); // Show game screen immediately so player can see the world
   });
   
   socket.on('gameStarted', (data) => {
     gameStarted = true;
     gameStartTime = data.startTime;
+    showGameScreen(); // Show game screen only when game actually starts
+    hideWaitingOverlay(); // Hide waiting overlay when game starts
+  });
+  
+  socket.on('waitingForPlayers', (data) => {
+    showNotification('battleNotification', data.message);
+    // Show waiting overlay on game screen
+    showWaitingOverlay(data.message);
   });
   
   socket.on('playerJoined', (data) => {
@@ -459,16 +548,19 @@ function setupSocketEvents() {
     showNotification('poopNotification');
   });
   
-  socket.on('playerDefeated', () => {
-    showNotification('battleNotification', '敗北しました！10秒後にリスポーンします...');
+  socket.on('playerEliminated', (data) => {
+    player.isAlive = false;
+    showNotification('battleNotification', `💀 ${data.playerName} has been eliminated!`);
+    updatePlayerDisplay();
   });
   
-  socket.on('playerRespawned', (data) => {
-    player.x = data.x;
-    player.y = data.y;
-    player.hearts = data.hearts;
-    player.isAlive = true;
-    updatePlayerDisplay();
+  socket.on('poopLimitReached', (data) => {
+    showNotification('poopNotification', data.message);
+  });
+  
+  socket.on('poopPlaced', (data) => {
+    player.poopCount = data.poopCount;
+    console.log(`💩 Poop placed! Count: ${player.poopCount}/5`);
   });
   
   socket.on('battleStart', (data) => {
@@ -476,32 +568,51 @@ function setupSocketEvents() {
   });
   socket.on('battleResult', (data) => {
     hideRPSBattle();
-    // Show result as notification
+    
+    // Create enhanced battle result message
     let msg = '';
+    let notificationType = 'battleNotification';
+    
     if (data.result === 'draw') {
-      msg = `あいこ！（引き分け）`;
+      msg = `🤝 DRAW! (あいこ！)`;
+      notificationType = 'battleNotification';
     } else if (data.winner === player.id) {
-      msg = `勝ち！あなた: ${data.yourChoice} 相手: ${data.opponentChoice}`;
+      msg = `🏆 YOU WIN! 🏆\nYour ${data.yourChoice} beats their ${data.opponentChoice}`;
+      notificationType = 'battleNotification';
     } else if (data.loser === player.id) {
-      msg = `負け... あなた: ${data.yourChoice} 相手: ${data.opponentChoice}`;
+      msg = `💔 YOU LOST! 💔\nYour ${data.yourChoice} loses to their ${data.opponentChoice}\n-1 ❤️`;
+      notificationType = 'battleNotification';
     }
-    showNotification('battleNotification', msg);
+    
+    // Show enhanced notification
+    showNotification(notificationType, msg);
+    
     // Update hearts if provided
     if (data.hearts && data.hearts[player.id] !== undefined) {
+      const oldHearts = player.hearts;
       player.hearts = data.hearts[player.id];
       updatePlayerDisplay();
+      
+      // Show heart change animation
+      if (player.hearts < oldHearts) {
+        console.log(`💔 Lost ${oldHearts - player.hearts} heart(s): ${oldHearts} → ${player.hearts}`);
+      }
     }
+    
+    // Log battle result for debugging
+    console.log('Battle Result:', {
+      winner: data.winner,
+      loser: data.loser,
+      result: data.result,
+      yourChoice: data.yourChoice,
+      opponentChoice: data.opponentChoice,
+      yourHearts: data.hearts[player.id],
+      isWinner: data.winner === player.id,
+      isLoser: data.loser === player.id
+    });
   });
   
-  socket.on('cuddleSuccess', (data) => {
-    if (data.player1.id === player.id) {
-      player.hearts = data.player1.hearts;
-    } else if (data.player2.id === player.id) {
-      player.hearts = data.player2.hearts;
-    }
-    updatePlayerDisplay();
-    showNotification('cuddleNotification');
-  });
+
   
   socket.on('leaderboardUpdate', (leaderboard) => {
     updateLeaderboard(leaderboard);
@@ -521,6 +632,9 @@ function joinGame() {
   const peeColor = selectedPeeColor || '#FFD700';
   console.log('Joining game with peeColor:', peeColor);
   socket.emit('joinGame', { name: playerName, breed, color, peeColor });
+  
+  // Also send the name update to trigger game start check
+  socket.emit('updatePlayerName', { name: playerName });
 }
 
 // Show game screen
@@ -562,6 +676,19 @@ function updatePlayerDisplay() {
 
 // Handle keyboard input
 function handleKeyDown(e) {
+  // Check if user is typing in an input field
+  const activeElement = document.activeElement;
+  const isTyping = activeElement && (
+    activeElement.tagName === 'INPUT' || 
+    activeElement.tagName === 'TEXTAREA' || 
+    activeElement.contentEditable === 'true'
+  );
+  
+  // If user is typing, don't handle game commands
+  if (isTyping) {
+    return;
+  }
+  
   keys[e.key.toLowerCase()] = true;
   
   // Action keys
@@ -571,9 +698,7 @@ function handleKeyDown(e) {
   } else if (e.key.toLowerCase() === 'p') {
     e.preventDefault();
     poop();
-  } else if (e.key.toLowerCase() === 'c') {
-    e.preventDefault();
-    cuddle();
+
   } else if (e.key === 'Escape') {
     // Close leaderboard with ESC key
     if (!leaderboardModal.classList.contains('hidden')) {
@@ -583,6 +708,19 @@ function handleKeyDown(e) {
 }
 
 function handleKeyUp(e) {
+  // Check if user is typing in an input field
+  const activeElement = document.activeElement;
+  const isTyping = activeElement && (
+    activeElement.tagName === 'INPUT' || 
+    activeElement.tagName === 'TEXTAREA' || 
+    activeElement.contentEditable === 'true'
+  );
+  
+  // If user is typing, don't handle game commands
+  if (isTyping) {
+    return;
+  }
+  
   keys[e.key.toLowerCase()] = false;
 }
 
@@ -615,6 +753,12 @@ function handleCanvasClick(e) {
 function pee() {
   if (!player || !player.isAlive || player.peeCharge < 20) return;
   
+  // Check if game has started
+  if (!gameStarted) {
+    showNotification('battleNotification', 'Waiting for more players to join before you can pee!');
+    return;
+  }
+  
   // Check if there are at least 2 players (current player + at least 1 other)
   let aliveOtherPlayers = 0;
   for (const [id, otherPlayer] of otherPlayers) {
@@ -638,6 +782,12 @@ function pee() {
 function poop() {
   if (!player || !player.isAlive) return;
   
+  // Check if game has started
+  if (!gameStarted) {
+    showNotification('battleNotification', 'Waiting for more players to join before you can poop!');
+    return;
+  }
+  
   // Check if there are at least 2 players (current player + at least 1 other)
   let aliveOtherPlayers = 0;
   for (const [id, otherPlayer] of otherPlayers) {
@@ -658,34 +808,25 @@ function poop() {
   socket.emit('poop', { x: player.x, y: player.y });
 }
 
-function cuddle() {
-  if (!player || !player.isAlive) return;
-  
-  const now = Date.now();
-  if (now - lastCuddleTime < 2000) return; // Cooldown
-  
-  lastCuddleTime = now;
-  
-  // Find nearest player
-  let nearestPlayer = null;
-  let minDistance = Infinity;
-  
-  for (const [id, otherPlayer] of otherPlayers) {
-    if (!otherPlayer.isAlive) continue;
-    
-    const distance = Math.sqrt(
-      Math.pow(player.x - otherPlayer.x, 2) + 
-      Math.pow(player.y - otherPlayer.y, 2)
-    );
-    
-    if (distance < minDistance && distance < 40) {
-      minDistance = distance;
-      nearestPlayer = otherPlayer;
+
+
+// Show waiting overlay
+function showWaitingOverlay(message) {
+  const overlay = document.getElementById('waitingOverlay');
+  if (overlay) {
+    const messageEl = overlay.querySelector('.waiting-message');
+    if (messageEl) {
+      messageEl.textContent = message;
     }
+    overlay.classList.remove('hidden');
   }
-  
-  if (nearestPlayer) {
-    socket.emit('cuddle', { targetId: nearestPlayer.id });
+}
+
+// Hide waiting overlay
+function hideWaitingOverlay() {
+  const overlay = document.getElementById('waitingOverlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
   }
 }
 
@@ -695,22 +836,45 @@ function showNotification(type, message = '') {
   const content = notification.querySelector('div');
   
   if (message) {
-    content.innerHTML = `<h3>${type === 'battleNotification' ? '⚔️ Battle!' : 
-      type === 'cuddleNotification' ? '🤗 Hug Success!' : '💩 Poop Mine!'}</h3>
-      <p>${message}</p>`;
+    // Enhanced battle result styling
+    if (type === 'battleNotification') {
+      let title = '⚔️ Battle!';
+      let messageClass = '';
+      
+      // Determine message styling based on content
+      if (message.includes('YOU WIN')) {
+        title = '🏆 Victory!';
+        messageClass = 'battle-win';
+      } else if (message.includes('YOU LOST')) {
+        title = '💔 Defeat!';
+        messageClass = 'battle-loss';
+      } else if (message.includes('DRAW')) {
+        title = '🤝 Draw!';
+        messageClass = 'battle-draw';
+      }
+      
+      content.innerHTML = `
+        <h3>${title}</h3>
+        <p class="${messageClass}">${message}</p>
+      `;
+    } else {
+      content.innerHTML = `<h3>💩 Poop Mine!</h3><p>${message}</p>`;
+    }
   }
   
   notification.classList.remove('hidden');
   
-  // Add retro glitch effect
+  // Add enhanced visual effects
   notification.classList.add('glitch');
   setTimeout(() => {
     notification.classList.remove('glitch');
   }, 300);
   
+  // Show notification longer for battle results
+  const duration = type === 'battleNotification' ? 4000 : 3000;
   setTimeout(() => {
     notification.classList.add('hidden');
-  }, 3000);
+  }, duration);
 }
 
 // Update leaderboard
@@ -738,11 +902,16 @@ function updateLeaderboard(leaderboard) {
 }
 
 // Show game over
-function showGameOver(winner) {
+function showGameOver(data) {
+  const winner = data.winner;
+  const message = data.message || '';
+  
   gameOverContent.innerHTML = `
     <h3>🏆 Game Over!</h3>
+    ${message ? `<p><strong>${message}</strong></p>` : ''}
     ${winner ? `
       <p><strong>Winner: ${winner.name}</strong></p>
+      <p>Breed: ${winner.breed}</p>
       <p>Territory: ${winner.territoryPercentage.toFixed(1)}%</p>
       <p>Hearts: ❤️ ${winner.hearts}</p>
     ` : '<p>The game has ended!</p>'}
@@ -779,6 +948,54 @@ function gameLoop() {
 // Update player movement
 function updatePlayerMovement() {
   if (!player || !player.isAlive) return;
+  
+  // Allow movement even when game hasn't started, but don't send to server
+  if (!gameStarted) {
+    // Local movement only - don't send to server
+    const speed = 3;
+    let moved = false;
+
+    // Keyboard controls
+    if (keys['w'] || keys['arrowup']) {
+      player.y = Math.max(15, player.y - speed);
+      moved = true;
+    }
+    if (keys['s'] || keys['arrowdown']) {
+      player.y = Math.min(585, player.y + speed);
+      moved = true;
+    }
+    if (keys['a'] || keys['arrowleft']) {
+      player.x = Math.max(15, player.x - speed);
+      moved = true;
+    }
+    if (keys['d'] || keys['arrowright']) {
+      player.x = Math.min(785, player.x + speed);
+      moved = true;
+    }
+    
+    // Touch controls
+    if (isTouching && (touchDirection.x !== 0 || touchDirection.y !== 0)) {
+      if (touchDirection.y < 0) {
+        player.y = Math.max(15, player.y - speed);
+        moved = true;
+      }
+      if (touchDirection.y > 0) {
+        player.y = Math.min(585, player.y + speed);
+        moved = true;
+      }
+      if (touchDirection.x < 0) {
+        player.x = Math.max(15, player.x - speed);
+        moved = true;
+      }
+      if (touchDirection.x > 0) {
+        player.x = Math.min(785, player.x + speed);
+        moved = true;
+      }
+    }
+    
+    // Don't send movement to server when game hasn't started
+    return;
+  }
   
   const speed = 3;
   let moved = false;
@@ -823,7 +1040,7 @@ function updatePlayerMovement() {
     }
   }
 
-  // --- Pee recharge in house logic ---
+  // --- Pee recharge in own house logic ---
   if (townMap && townMap.houses && player) {
     for (const house of townMap.houses) {
       if (
@@ -833,7 +1050,8 @@ function updatePlayerMovement() {
         player.y < house.y + house.height
       ) {
         wasInHouse = true;
-        if (typeof player.peeCharge === 'number' && player.peeCharge < 100) {
+        // Only recharge if this is the player's own house (matching color)
+        if (house.color === player.color && typeof player.peeCharge === 'number' && player.peeCharge < 100) {
           player.peeCharge = Math.min(100, player.peeCharge + 2); // Recharge 2% per frame
           peeRecharged = true;
         }
@@ -1193,36 +1411,14 @@ function render() {
         break;
     }
     
-    // Realistic doors and windows for each house type
-    let doorX = house.x + 15;
+    // Uniform doors for all house types
+    let doorX = house.x + 20;
     let doorY = house.y + 25;
-    let doorWidth = 30;
-    let doorHeight = 35;
+    let doorWidth = 20;
+    let doorHeight = 25;
     
-    if (houseType === 1) { // Modern house
-      doorX = house.x + 25;
-      doorY = house.y + 25;
-      doorWidth = 30;
-      doorHeight = 35;
-    } else if (houseType === 2) { // Cottage
-      doorX = house.x + 20;
-      doorY = house.y + 20;
-      doorWidth = 25;
-      doorHeight = 40;
-    } else if (houseType === 3) { // Japanese house
-      doorX = house.x + 20;
-      doorY = house.y + 30;
-      doorWidth = 20;
-      doorHeight = 30;
-    } else if (houseType === 4) { // Mediterranean
-      doorX = house.x + 25;
-      doorY = house.y + 25;
-      doorWidth = 30;
-      doorHeight = 35;
-    }
-    
-    // Realistic door
-    ctx.fillStyle = '#8B4513';
+    // Realistic door painted with house color
+    ctx.fillStyle = house.color;
     ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
     ctx.strokeStyle = '#654321';
     ctx.lineWidth = 2;
@@ -1234,24 +1430,24 @@ function render() {
     ctx.arc(doorX + doorWidth - 5, doorY + doorHeight/2, 2, 0, Math.PI * 2);
     ctx.fill();
     
-    // Realistic windows (positioned appropriately for each house type)
-    let windowX = house.x + 8;
-    let windowY = house.y + 12;
+    // Realistic windows (positioned to avoid door overlap)
+    let windowX = house.x + 5;
+    let windowY = house.y + 8;
     
     if (houseType === 0) { // Victorian
-      windowX = house.x + 8;
-      windowY = house.y + 12;
+      windowX = house.x + 5;
+      windowY = house.y + 8;
     } else if (houseType === 1) { // Modern (already drawn above)
       // Windows already drawn in modern house
     } else if (houseType === 2) { // Cottage
-      windowX = house.x + 10;
-      windowY = house.y + 15;
+      windowX = house.x + 5;
+      windowY = house.y + 8;
     } else if (houseType === 3) { // Japanese
-      windowX = house.x + 8;
-      windowY = house.y + 10;
+      windowX = house.x + 5;
+      windowY = house.y + 8;
     } else if (houseType === 4) { // Mediterranean
-      windowX = house.x + 8;
-      windowY = house.y + 12;
+      windowX = house.x + 5;
+      windowY = house.y + 8;
     }
     
     if (houseType !== 1) { // Don't redraw modern windows
@@ -1272,16 +1468,7 @@ function render() {
       ctx.stroke();
     }
     
-    // House number with realistic style
-    ctx.fillStyle = '#333333';
-    ctx.font = 'bold 12px Inter';
-    ctx.textAlign = 'center';
-    let numberY = house.y + 20;
-    if (houseType === 1) numberY = house.y + 18;
-    else if (houseType === 2) numberY = house.y + 18;
-    else if (houseType === 3) numberY = house.y + 20;
-    else if (houseType === 4) numberY = house.y + 18;
-    ctx.fillText(house.id + 1, centerX, numberY);
+
     
     // Realistic architectural details
     if (houseType === 0) { // Victorian details
